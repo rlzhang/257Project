@@ -1,0 +1,2 @@
+match (u:person) where "#1" in u.feats return u.name, u.feats
+

@@ -1,6 +1,7 @@
 from classes.Circle import Circle
 from classes.Network import Network
 from classes.User import User
+from edgeMaker import driver
 from os import walk
 from neo4j import GraphDatabase
 import re
@@ -27,8 +28,13 @@ def _create_circle(tx,netName,cir):
         "SET c.name = $name ",name=netName + '-' + cir.name)
 
 def _create_user(tx,netName,usr):
+    ufeats = ['--none--']
+    if(usr.features):
+        ufeats = usr.features
+
     tx.run("CREATE (u:User) "
-        "SET u.name = $name ",name=netName + '-' + usr.name)
+        "SET u.name = $name "
+        "SET u.feats = $feats ",name=netName + '-' + usr.name,feats=ufeats)
 
 mUri = "bolt://localhost:7687"
 conn = GraphDatabase.driver(uri=mUri, auth=('neo4j', 'sjsu123'),encrypted=False)
@@ -50,6 +56,7 @@ for nName in networks:
     circles = []
     features = []
     users = []
+    edges = {}
 
     with open('./data/' + nName + '.circles') as C:
         cContent = C.readlines()
@@ -87,7 +94,18 @@ for nName in networks:
             mUser = User(uName,ufeats)
             users.append(mUser)    
     
-    #todo: Create network, make these objects in the db, create connections (edgeMaker.py)
+    with open('./data/' + nName + '.edges',encoding='utf-8') as E:
+        eContent = E.readlines()
+        for line in eContent:
+                token = line.split()
+                if token[0] in edges.keys():
+                    edges[token[0]].append(token[1])
+                else:
+                    edges[token[0]] = []
+                    edges[token[0]].append(token[1])
+                    
+
+    #todo: inser user's feature array into db
     mNetwork = Network(nName,circles,users)
 
     #insert all into graphdb
@@ -99,6 +117,8 @@ for nName in networks:
 
         for usr in users:
             session.write_transaction(_create_user,nName,usr)
+
+        driver(session,mNetwork,circles,users,edges)
 
     #remove later
     exit(0)
