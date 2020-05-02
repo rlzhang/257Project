@@ -36,29 +36,23 @@ def _create_user(tx,netName,usr):
         "SET u.name = $name "
         "SET u.feats = $feats ",name=netName + '-' + usr.name,feats=ufeats)
 
-mUri = "bolt://localhost:7687"
-conn = GraphDatabase.driver(uri=mUri, auth=('neo4j', 'sjsu123'),encrypted=False)
+def getNetworks(path):
+    networks = []
+    filePat = '^(\d*)\.([a-zA-Z]*)'
+    r = re.compile(filePat)
+    for (dirpath,dirnames,filenames) in walk(path):
+        for f in filenames:
+            res = r.match(f)
+            network = res.group(1)
 
-print('con success!')
+            if(network not in networks):
+                networks.append(network)
+    
+    return networks
 
-networks = []
-filePat = '^(\d*)\.([a-zA-Z]*)'
-r = re.compile(filePat)
-for (dirpath,dirnames,filenames) in walk('./data'):
-    for f in filenames:
-        res = r.match(f)
-        network = res.group(1)
-
-        if(network not in networks):
-            networks.append(network)
-
-for nName in networks:
+def getCircles(path,netName):
     circles = []
-    features = []
-    users = []
-    edges = {}
-
-    with open('./data/' + nName + '.circles') as C:
+    with open(path + netName + '.circles') as C:
         cContent = C.readlines()
         for line in cContent:
             token = line.split()
@@ -70,13 +64,21 @@ for nName in networks:
             
             mCircle = Circle(circleName,circleUsers)
             circles.append(mCircle)
-    
-    with open('./data/' + nName + '.featnames',encoding='utf-8') as F:
+
+    return circles    
+
+def getFeatures(path,netName):
+    features = []
+    with open(path + netName + '.featnames',encoding='utf-8') as F:
         fContent = F.readlines()
         for line in fContent:
             features.append(line.split()[1])
-    
-    with open('./data/' + nName + '.feat',encoding='utf-8') as F1:
+
+    return features
+
+def getUsers(path,netName,features):
+    users = []
+    with open(path + netName + '.feat',encoding='utf-8') as F1:
         f1Content = F1.readlines()
         for line in f1Content:
             token = line.split()
@@ -92,9 +94,13 @@ for nName in networks:
                 ufeats.append(features[p])
             
             mUser = User(uName,ufeats)
-            users.append(mUser)    
-    
-    with open('./data/' + nName + '.edges',encoding='utf-8') as E:
+            users.append(mUser)
+
+    return users
+
+def getEdges(path,netName):
+    edges = {}
+    with open(path + netName + '.edges',encoding='utf-8') as E:
         eContent = E.readlines()
         for line in eContent:
                 token = line.split()
@@ -103,30 +109,43 @@ for nName in networks:
                 else:
                     edges[token[0]] = []
                     edges[token[0]].append(token[1])
+    
+    return edges
+
+def mDriver(netNum):
+    mUri = "bolt://localhost:7687"
+    conn = GraphDatabase.driver(uri=mUri, auth=('neo4j', 'sjsu123'),encrypted=False)
+
+    print('con success!')
+
+    networks = getNetworks('./data')
+
+    count = 0
+    for nName in networks:
+        count += 1
+        circles = getCircles('./data/',nName)
+        features = getFeatures('./data/',nName)
+        users = getUsers('./data/',nName,features)  
+        edges = getEdges('./data/',nName)
                     
 
     #todo: inser user's feature array into db
-    mNetwork = Network(nName,circles,users)
+        mNetwork = Network(nName,circles,users)
 
     #insert all into graphdb
-    with conn.session() as session:
-        session.write_transaction(_create_network,mNetwork)
+        with conn.session() as session:
+            session.write_transaction(_create_network,mNetwork)
 
-        for cir in circles:
-            session.write_transaction(_create_circle,nName,cir)
+            for cir in circles:
+                session.write_transaction(_create_circle,nName,cir)
 
-        for usr in users:
-            session.write_transaction(_create_user,nName,usr)
+            for usr in users:
+                session.write_transaction(_create_user,nName,usr)
 
-        driver(session,mNetwork,circles,users,edges)
+            driver(session,mNetwork,circles,users,edges)
 
-    #remove later
-    exit(0)
-conn.close()
-#with open('./data/' + networks[0] + '.circles') as C:
-#    c1 = C.readlines()
-#    for line in c1:
-#        token = line.split()
-#        print(token)
-#        for i in range(1,len(token)):
-#            print(token[i])
+        if(count == netNum):
+            exit(0)
+    conn.close()
+
+mDriver(3)

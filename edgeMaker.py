@@ -20,7 +20,7 @@ def _circle_user(tx,network,circle,userName):
 def _user_follows_user(tx,network,u1,u2):
     tx.run("MATCH (u1:User),(u2:User) "
     "WHERE u1.name = $u1Name AND u2.name=$u2Name "
-    "CREATE (u1)-[r:Follows]->(u2) ",u1Name=network.name + '-' + u1,u2Name=network.name + '-' + u2)
+    "CREATE (u1)-[r:Friends]->(u2) ",u1Name=network.name + '-' + u1,u2Name=network.name + '-' + u2)
 
 def driver(session,network,circles,users,edges):
     for c in circles:
