@@ -1,0 +1,40 @@
+
+
+
+
+Predict Future Connections between Facebook Pages
+
+
+Original dataset: http://networkrepository.com/fb-pages-food.php
+
+
+Use neo4j database 3.5.17.
+Install APOC and Graph Algorithms plugin.
+
+1) Create user:
+
+LOAD CSV WITH HEADERS FROM "file:///fb-pages-food.csv" AS line
+CREATE (:user { id: line.id, name: line.name, new_id: line.new_id})
+
+
+2) Create: FOLLOWS
+
+LOAD CSV WITH HEADERS FROM "file:///connect.csv" AS row
+MERGE (u1:user {new_id: row.from})
+MERGE (u2:user {new_id: row.to})
+MERGE (u2)-[r:FOLLOWS]->(u1)
+
+3) Create TRAIN:
+LOAD CSV WITH HEADERS FROM "file:///test.csv" AS row
+MERGE (u1:user {new_id: row.from})
+MERGE (u2:user {new_id: row.to})
+CREATE (u2)-[r:TRAIN {flag: row.flag}]->(u1)
+
+4) Create TRAINVEC:
+
+LOAD CSV WITH HEADERS FROM "file:///train2.csv" AS row
+MERGE (u1:user {new_id: row.from})
+MERGE (u2:user {new_id: row.to})
+CREATE (u2)-[r:TRAINVEC {flag: row.flag}]->(u1)
+
+Run fb.ipynb to evaluate the result.
